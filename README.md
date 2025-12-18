@@ -1,90 +1,74 @@
-```md
-# Data Engineering Intern Hiring Assignment
-
 ## Overview
-This project demonstrates a data engineering pipeline that transforms **daily stock price data** into **monthly aggregated datasets** and computes key **technical indicators** used in financial analysis.
+This project implements a data engineering pipeline to transform daily stock price data into monthly aggregated datasets and compute commonly used technical indicators. The objective is to provide a macro-level view of financial data by resampling daily prices, calculating moving averages, and partitioning the results per stock symbol.
 
-The solution focuses on:
-- Correct financial aggregation logic (OHLC)
-- Vectorized time-series processing using Pandas
-- Clean, modular, and production-style code structure
-
-The final output consists of **one CSV file per stock ticker**, each containing **24 monthly records** with calculated indicators.
+The solution is implemented using Python and Pandas only, following vectorized operations and a modular code structure.
 
 ---
 
 ## Dataset
-- **Source:** https://github.com/sandeep-tt/tt-intern-dataset
-- **Duration:** 2 years of daily stock price data
-- **Tickers:**  
-  `AAPL, AMD, AMZN, AVGO, CSCO, MSFT, NFLX, PEP, TMUS, TSLA`
+- Source: https://github.com/sandeep-tt/tt-intern-dataset  
+- Duration: 2 years of daily stock price data  
+- Stock Symbols:
+```
+
+AAPL, AMD, AMZN, AVGO, CSCO, MSFT, NFLX, PEP, TMUS, TSLA
+
+```
 
 ### Input Schema
 ```
 
 date, volume, open, high, low, close, adjclose, ticker
 
-```
+````
 
 ---
 
-## Solution Approach
+## Approach
+The problem is treated as a small ETL-style data pipeline consisting of the following steps:
 
-The problem is implemented as a small **ETL-style data pipeline**:
+1. **Data Ingestion**
+   - Load the CSV file using Pandas
+   - Parse the `date` column as datetime
+   - Sort records by `ticker` and `date`
+   - Validate the presence of required columns
 
-### 1. Extract
-- Load the raw CSV file
-- Parse dates and validate schema
-- Sort data by ticker and date to ensure time-series correctness
+2. **Monthly Aggregation**
+   Daily stock prices are resampled to monthly frequency using financially correct OHLC logic:
+   - Open: first trading day of the month
+   - Close: last trading day of the month
+   - High: maximum price during the month
+   - Low: minimum price during the month
+   - Volume: sum of daily volumes
 
-### 2. Transform (Monthly Aggregation)
-Daily stock prices are resampled to **monthly frequency** using financially correct OHLC rules:
+3. **Technical Indicators**
+   Technical indicators are calculated after monthly aggregation using monthly closing prices:
+   - Simple Moving Average (SMA 10, SMA 20)
+   - Exponential Moving Average (EMA 10, EMA 20)
 
-| Field | Monthly Logic |
-|------|---------------|
-| Open | First trading day of the month |
-| Close | Last trading day of the month |
-| High | Maximum price during the month |
-| Low | Minimum price during the month |
-| Volume | Sum of daily volumes |
-
-### 3. Enrich (Technical Indicators)
-Technical indicators are calculated **after monthly aggregation**, based on **monthly closing prices**:
-- SMA 10
-- SMA 20
-- EMA 10
-- EMA 20
-
-### 4. Partition & Persist
-- Data is processed **independently per ticker**
-- One output CSV is generated per ticker following the naming convention:
-```
-
-result_<TICKER>.csv
-
-```
+4. **Data Partitioning**
+   - Each stock ticker is processed independently
+   - One CSV file is generated per ticker following the naming convention:
+     ```
+     result_<TICKER>.csv
+     ```
 
 ---
 
 ## Project Structure
-
-```
+````
 
 stock-data-engineering/
-│
 ├── data/
 │   └── stock_prices.csv
-│
 ├── src/
-│   ├── loader.py        # Data loading & validation
-│   ├── transformer.py  # Monthly OHLC aggregation
-│   ├── indicators.py   # SMA & EMA calculations
-│   ├── writer.py       # Output file generation
-│
+│   ├── loader.py
+│   ├── transformer.py
+│   ├── indicators.py
+│   ├── writer.py
 ├── output/
 │   └── result_AAPL.csv
-│
-├── main.py              # Pipeline orchestration
+├── main.py
 ├── requirements.txt
 └── README.md
 
@@ -92,47 +76,34 @@ stock-data-engineering/
 
 ---
 
-## Technical Decisions & Rationale
-
-### Why resample before calculating indicators?
-Technical indicators must reflect **monthly trends**, not daily fluctuations.  
-Indicators are therefore calculated on **monthly closing prices**, after resampling.
-
-### Why SMA has missing values initially?
-Simple Moving Averages require a full window (10 or 20 months).  
-Missing values (`NaN`) for early months are **expected and correct**.
-
-### Why EMA appears earlier than SMA?
-EMA uses a recursive formula and can be initialized from the first available value, allowing it to be computed immediately.
-
-### Why Pandas only?
-The assignment constraints require:
-- Vectorized operations
-- No third-party technical analysis libraries  
-Pandas’ `resample`, `rolling`, and `ewm` functions satisfy these requirements efficiently.
+## Technical Decisions and Rationale
+- Monthly resampling is performed before calculating indicators to ensure that SMA and EMA reflect long-term trends rather than daily noise.
+- SMA values are unavailable for initial months due to insufficient historical data, which is expected behavior.
+- EMA values are available from the first month since EMA uses a recursive calculation and can be initialized from the first available closing price.
+- Pandas `resample`, `rolling`, and `ewm` functions are used to ensure vectorized and efficient computations without relying on third-party technical analysis libraries.
 
 ---
 
 ## Assumptions
-- Input data contains valid daily trading records
-- Each ticker has continuous data covering exactly 24 months
-- Missing SMA values for initial months are acceptable
-- No missing or corrupt rows in the input dataset
+- The input dataset contains valid and continuous daily trading records.
+- Each stock ticker spans exactly 24 months.
+- Missing SMA values in initial rows are acceptable and mathematically correct.
+- The dataset does not contain missing or corrupt critical values.
 
 ---
 
 ## How to Run
 
 ### Prerequisites
-- Python 3.8+
+- Python 3.8 or higher
 - Pandas
 
-### Install Dependencies
+### Installation
 ```bash
 pip install -r requirements.txt
 ````
 
-### Execute Pipeline
+### Execution
 
 ```bash
 python main.py
@@ -142,23 +113,8 @@ python main.py
 
 ## Output
 
-* **10 CSV files** generated under the `output/` directory
-* Each file:
-
-  * Represents one stock ticker
-  * Contains exactly **24 monthly records**
-  * Includes OHLC values and SMA/EMA indicators
+* The pipeline generates 10 CSV files under the `output/` directory.
+* Each file contains exactly 24 rows, representing monthly data for one stock ticker.
+* Output files include monthly OHLC values along with SMA and EMA indicators.
 
 ---
-
-## Evaluation Alignment
-
-This solution explicitly addresses:
-
-* ✔ Correct OHLC aggregation
-* ✔ Accurate SMA & EMA calculations
-* ✔ Efficient per-ticker partitioning
-* ✔ Vectorized Pandas operations
-* ✔ Clean, modular code structure
-
-```
